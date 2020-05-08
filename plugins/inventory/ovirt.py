@@ -83,6 +83,7 @@ compose:
 '''
 
 import sys
+import time
 
 from ansible.plugins.inventory import BaseInventoryPlugin, Constructable, Cacheable
 from ansible.errors import AnsibleError, AnsibleParserError
@@ -117,6 +118,10 @@ class InventoryModule(BaseInventoryPlugin, Constructable, Cacheable):
             vm.cluster.id
         ).affinity_groups_service().list()
 
+        try:
+            time_stamp = vm.creation_time.timestamp()
+        except AttributeError:
+            time_stamp = time.time()
         return {
             'id': vm.id,
             'name': vm.name,
@@ -128,7 +133,7 @@ class InventoryModule(BaseInventoryPlugin, Constructable, Cacheable):
             'os_type': vm.os.type,
             'template': self.connection.follow_link(vm.template).name,
             'creation_time': str(vm.creation_time),
-            'creation_time_timestamp': vm.creation_time.timestamp(),
+            'creation_time_timestamp': time_stamp,
             'tags': [tag.name for tag in tags],
             'affinity_labels': [label.name for label in labels],
             'affinity_groups': [
@@ -217,9 +222,10 @@ class InventoryModule(BaseInventoryPlugin, Constructable, Cacheable):
             for fact, value in host.items():
                 self.inventory.set_variable(hostname, fact, value)
 
-            self._set_composite_vars(self.get_option('compose'), host, hostname)
-            self._add_host_to_composed_groups(self.get_option('groups'), host, hostname)
-            self._add_host_to_keyed_groups(self.get_option('keyed_groups'), host, hostname)
+            strict = self.get_option('strict')
+            self._set_composite_vars(self.get_option('compose'), host, hostname, strict=strict)
+            self._add_host_to_composed_groups(self.get_option('groups'), host, hostname, strict=strict)
+            self._add_host_to_keyed_groups(self.get_option('keyed_groups'), host, hostname, strict=strict)
 
     def verify_file(self, path):
 
